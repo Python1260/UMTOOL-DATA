@@ -6,6 +6,7 @@ import argparse
 import urllib.request
 import zipfile
 import platform
+import math
 
 # ------------------------ Automatic Installers ------------------------
 
@@ -26,7 +27,6 @@ def set_status(name, rel):
 def download_progress(count, block_size, total_size):
     downloaded = count * block_size
     percent = int(min(1, downloaded / total_size))
-
     set_status("download", percent)
 
 def download_and_extract_ffmpeg(dest_folder):
@@ -34,17 +34,11 @@ def download_and_extract_ffmpeg(dest_folder):
     os.makedirs(dest_folder, exist_ok=True)
     zip_path = os.path.join(dest_folder, "ffmpeg.zip")
 
-    # If zip already exists: skip downloading
-    if os.path.isfile(zip_path):
-        pass
-    else:
+    if not os.path.isfile(zip_path):
         urllib.request.urlretrieve(ffmpeg_url, zip_path, reporthook=download_progress)
 
-    # Detect extracted dir name
     extracted_dir = next((d for d in os.listdir(dest_folder) if d.startswith("ffmpeg-")), None)
-    if extracted_dir:
-        pass
-    else:
+    if not extracted_dir:
         with zipfile.ZipFile(zip_path, "r") as zip_ref:
             zip_ref.extractall(dest_folder)
         extracted_dir = next((d for d in os.listdir(dest_folder) if d.startswith("ffmpeg-")), None)
@@ -74,36 +68,31 @@ def check_and_setup_ffmpeg():
 def main():
     check_and_setup_ffmpeg()
 
-    parser = argparse.ArgumentParser(description="🎵 Mix .ogg files with offsets and durations into one output.ogg")
+    parser = argparse.ArgumentParser(description="🎵 Mix .ogg files with offsets, durations, and scales into one output.ogg")
     parser.add_argument("--files", nargs="+", required=True, help="List of input .ogg files")
     parser.add_argument("--offsets", nargs="+", type=float, required=True, help="Start time (in seconds) for each file")
     parser.add_argument("--lengths", nargs="+", type=float, required=True, help="Duration (in seconds) for each file")
+    parser.add_argument("--volumes", nargs="+", type=float, required=True, help="Volume scale factor for each file (e.g. 1.0 = 100%)")
     parser.add_argument("--output", default="output.ogg", help="Output .ogg filename (default: output.ogg)")
     args = parser.parse_args()
 
-    if not (len(args.files) == len(args.offsets) == len(args.lengths)):
-        parser.error("The number of --files, --offsets, and --lengths must match.")
+    if not (len(args.files) == len(args.offsets) == len(args.lengths) == len(args.scales)):
+        parser.error("The number of --files, --offsets, --lengths and --volumes must match.")
 
-    # Determine total duration in ms
     total_end_ms = max(int((off + length) * 1000) for off, length in zip(args.offsets, args.lengths))
-
-    # Create silent base segment with correct duration
     final_mix = AudioSegment.silent(duration=total_end_ms)
 
-    # Overlay each file at correct position
-    for file, offset, length in zip(args.files, args.offsets, args.lengths):
+    for file, offset, length, scale in zip(args.files, args.offsets, args.lengths, args.scales):
+        if scale <= 0:
+            parser.error("Volume scale must be greater than 0.")
+
         audio = AudioSegment.from_ogg(file)
         segment = audio[:int(length * 1000)]
+        gain_dB = 20 * math.log10(scale)
+        segment = segment + gain_dB
         final_mix = final_mix.overlay(segment, position=int(offset * 1000))
 
-    for i, (file, offset, length) in enumerate(zip(args.files, args.offsets, args.lengths)):
-        audio = AudioSegment.from_ogg(file)
-        segment = audio[:int(length * 1000)]
-        final_mix = final_mix.overlay(segment, position=int(offset * 1000))
-
-        percent = 1 if len(args.files) <= 1 else i / (len(args.files) - 1)
     set_status("export", 1)
-
     final_mix.export(args.output, format="ogg", codec="libvorbis")
 
 if __name__ == "__main__":
