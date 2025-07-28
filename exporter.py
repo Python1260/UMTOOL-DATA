@@ -76,19 +76,18 @@ def main():
     parser.add_argument("--output", default="output.ogg", help="Output .ogg filename (default: output.ogg)")
     args = parser.parse_args()
 
-    if not (len(args.files) == len(args.offsets) == len(args.lengths) == len(args.scales)):
+    if not (len(args.files) == len(args.offsets) == len(args.lengths) == len(args.volumes)):
         parser.error("The number of --files, --offsets, --lengths and --volumes must match.")
 
     total_end_ms = max(int((off + length) * 1000) for off, length in zip(args.offsets, args.lengths))
     final_mix = AudioSegment.silent(duration=total_end_ms)
 
-    for file, offset, length, scale in zip(args.files, args.offsets, args.lengths, args.scales):
-        if scale <= 0:
-            parser.error("Volume scale must be greater than 0.")
+    for file, offset, length, volume in zip(args.files, args.offsets, args.lengths, args.volumes):
+        volume = max(volume, 1e-8)
 
         audio = AudioSegment.from_ogg(file)
         segment = audio[:int(length * 1000)]
-        gain_dB = 20 * math.log10(scale)
+        gain_dB = 20 * math.log10(volume)
         segment = segment + gain_dB
         final_mix = final_mix.overlay(segment, position=int(offset * 1000))
 
