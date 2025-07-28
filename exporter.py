@@ -34,13 +34,21 @@ def download_and_extract_ffmpeg(dest_folder):
     os.makedirs(dest_folder, exist_ok=True)
     zip_path = os.path.join(dest_folder, "ffmpeg.zip")
 
-    urllib.request.urlretrieve(ffmpeg_url, zip_path, reporthook=download_progress)
+    # If zip already exists: skip downloading
+    if os.path.isfile(zip_path):
+        pass
+    else:
+        urllib.request.urlretrieve(ffmpeg_url, zip_path, reporthook=download_progress)
 
-    with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        zip_ref.extractall(dest_folder)
-    os.remove(zip_path)
-
+    # Detect extracted dir name
     extracted_dir = next((d for d in os.listdir(dest_folder) if d.startswith("ffmpeg-")), None)
+    if extracted_dir:
+        pass
+    else:
+        with zipfile.ZipFile(zip_path, "r") as zip_ref:
+            zip_ref.extractall(dest_folder)
+        extracted_dir = next((d for d in os.listdir(dest_folder) if d.startswith("ffmpeg-")), None)
+
     if not extracted_dir:
         sys.exit(1)
 
