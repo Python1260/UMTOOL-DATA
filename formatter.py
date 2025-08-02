@@ -18,6 +18,12 @@ except ImportError:
     pip_install("librosa")
     import librosa
 
+try:
+    import numba
+except ImportError:
+    pip_install("numba")
+    import numba
+
 # Optional - if ffmpeg not installed (common on Windows), bundle download
 def download_and_extract_ffmpeg(dest):
     url = "https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-essentials.zip"
@@ -62,7 +68,7 @@ def main():
 
     # Compute RMS per interval
     rms_values = []
-    for i in range(intervals + 1):
+    for i in numba.prange(intervals + 1):
         start = min(i * spacing_samples, total_samples)
         segment = y[start : min(start + spacing_samples, total_samples)]
         if segment.size == 0:
